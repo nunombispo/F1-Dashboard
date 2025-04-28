@@ -114,6 +114,17 @@ async def get_session_for_meeting(meeting_key: int) -> Optional[Dict]:
         if latest_session.get("date_end"):
             latest_session["date_end"] = format_date(latest_session["date_end"])
         
+        # Get weather data for the session
+        try:
+            weather_data = await fetch_data("weather", {"session_key": latest_session["session_key"]})
+            if weather_data:
+                # Get the latest weather data
+                weather_data.sort(key=lambda x: x.get("date", ""), reverse=True)
+                latest_session["weather"] = weather_data[0]
+        except Exception as e:
+            logger.error(f"Error fetching weather data: {str(e)}")
+            latest_session["weather"] = None
+        
         return latest_session
     except Exception as e:
         logger.error(f"Error fetching session for meeting {meeting_key}: {str(e)}")
