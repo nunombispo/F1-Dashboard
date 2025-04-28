@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F1 Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        .result-row:hover {
+            background-color: rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container py-4">
+        <header class="mb-4">
+            <h1 class="display-4 fw-bold text-primary">F1 Dashboard</h1>
+            <p class="lead text-muted">Latest Race Results</p>
+        </header>
+
+        <div class="row g-4">
+            <!-- Session Info -->
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h2 class="card-title h4 mb-3">Session Information</h2>
+                        <div class="mb-3">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-2"><strong>Session Type:</strong> {{ session.session_type }}</p>
+                                    <p class="mb-2"><strong>Session Name:</strong> {{ session.session_name }}</p>
+                                    <p class="mb-2"><strong>Meeting:</strong> {{ session.meeting_name }}</p>
+                                    <p class="mb-2"><strong>Track:</strong> {{ session.track_name }}</p>
+                                    <p class="mb-2"><strong>Circuit:</strong> {{ session.circuit_short_name }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-2"><strong>Country:</strong> {{ session.country_name }}</p>
+                                    <p class="mb-2"><strong>Year:</strong> {{ session.year }}</p>
+                                    <p class="mb-2"><strong>Start Time:</strong> {{ session.session_start_time }}</p>
+                                    <p class="mb-2"><strong>End Time:</strong> {{ session.session_end_time }}</p>
+                                    <p class="mb-2"><strong>GMT Offset:</strong> {{ session.gmt_offset }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% if session.weather %}
+                        <div class="border-top pt-3">
+                            <h3 class="h5 mb-3">Weather Conditions</h3>
+                            <div class="row">
+                                <div class="col-6">
+                                    <p class="mb-2"><strong>Air Temperature:</strong> {{ session.weather.air_temperature }}°C</p>
+                                    <p class="mb-2"><strong>Track Temperature:</strong> {{ session.weather.track_temperature }}°C</p>
+                                </div>
+                                <div class="col-6">
+                                    <p class="mb-2"><strong>Humidity:</strong> {{ session.weather.humidity }}%</p>
+                                    <p class="mb-2"><strong>Wind Speed:</strong> {{ session.weather.wind_speed }} m/s</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Race Results -->
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h2 class="card-title h4 mb-3">Race Results</h2>
+                        {% if results %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Pos</th>
+                                        <th>Driver</th>
+                                        <th>Team</th>
+                                        <th>Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for result in results %}
+                                    <tr class="result-row">
+                                        <td>{{ result.position }}</td>
+                                        <td>{{ result.driver_name }}</td>
+                                        <td>{{ result.team }}</td>
+                                        <td>{{ result.time }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No race results available</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Position Chart -->
+        <div class="card shadow-sm mt-4">
+            <div class="card-body">
+                <h2 class="card-title h4 mb-3">Position Chart</h2>
+                <div id="positionChart" class="w-100" style="height: 400px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            {% if position_chart %}
+            var positionData = {{ position_chart | safe }};
+            Plotly.newPlot('positionChart', positionData.data, positionData.layout);
+            {% endif %}
+        });
+    </script>
+</body>
+</html> 
