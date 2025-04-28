@@ -117,6 +117,37 @@
             color: #666;
             margin-top: 5px;
         }
+        .race-selector {
+            background: white;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .race-selector select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            color: #333;
+            background-color: white;
+            cursor: pointer;
+        }
+        .race-selector select:focus {
+            outline: none;
+            border-color: #e10600;
+            box-shadow: 0 0 0 2px rgba(225, 6, 0, 0.1);
+        }
+        .round-badge {
+            background: #e10600;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-right: 8px;
+        }
         @media (max-width: 768px) {
             .info-column {
                 margin-bottom: 20px;
@@ -140,8 +171,20 @@
                         <i class="fas fa-exclamation-circle"></i> {{ error }}
                     </div>
                     {% elif session %}
+                    <div class="race-selector">
+                        <select id="raceSelect" onchange="window.location.href=this.value">
+                            {% for race in races %}
+                            <option value="?meeting_key={{ race.meeting_key }}" 
+                                    {% if race.meeting_key == session.meeting_key %}selected{% endif %}>
+                                <span class="round-badge">Round #{{ race.round_number }} - 
+                                {{ race.meeting_official_name }} ({{ race.date_start[:10] }})</span>
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
                     <div class="session-header">
-                        <h3>Latest Session</h3>
+                        <h3>{{ session.meeting_official_name }}</h3>
                         <span class="session-type">{{ session.session_type or 'N/A' }}</span>
                     </div>
                     

@@ -21,6 +21,10 @@ templates = Jinja2Templates(directory="templates")
 # OpenF1 API base URL
 OPENF1_BASE_URL = "https://api.openf1.org/v1"
 
+# List of session types to exclude (testing sessions)
+EXCLUDED_SESSION_TYPES = ["Testing", "Pre-Season Testing", "Post-Season Testing"]
+
+# Fetch data from OpenF1 API
 async def fetch_data(endpoint: str, params: Optional[Dict] = None) -> List[Dict]:
     """Fetch data from OpenF1 API"""
     url = f"{OPENF1_BASE_URL}/{endpoint}"
@@ -41,6 +45,7 @@ async def fetch_data(endpoint: str, params: Optional[Dict] = None) -> List[Dict]
             logger.error(f"Unexpected error fetching {endpoint}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
+# Format date string to a more readable format
 def format_date(date_str: str) -> str:
     """Format date string to a more readable format"""
     if not date_str:
@@ -51,55 +56,120 @@ def format_date(date_str: str) -> str:
     except:
         return date_str
 
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    """Render the home page with latest session data"""
+# Get all races for the current year
+async def get_all_races() -> List[Dict]:
+    """Get all races for the current year"""
+    current_year = datetime.now().year
     try:
-        # Get sessions from the last 30 days
-        end_date = datetime.utcnow()
-        start_date = end_date - timedelta(days=30)
+        # Get all meetings for the current year
+        meetings = await fetch_data("meetings", {"year": current_year})
         
-        # Format dates for API
-        start_str = start_date.strftime("%Y-%m-%d")
-        end_str = end_date.strftime("%Y-%m-%d")
+        # Filter out testing sessions and add round numbers
+        race_meetings = []
+        round_number = 1
         
-        logger.info(f"Fetching sessions between {start_str} and {end_str}")
+        for meeting in meetings:
+            # Skip if it's a testing session
+            if any(test_type in meeting.get("meeting_name", "") for test_type in EXCLUDED_SESSION_TYPES):
+                continue
+            
+            # Add round number
+            meeting["round_number"] = round_number
+            round_number += 1
+            # Add 2 days to the date_start
+            meeting["date_start"] = (datetime.fromisoformat(meeting["date_start"]) + timedelta(days=2)).isoformat()
+            race_meetings.append(meeting)
         
-        # Get latest session
-        sessions = await fetch_data("sessions", {
-            "date_start>": start_str,
-            "date_end<": end_str
-        })
+        # Sort meetings by date
+        race_meetings.sort(key=lambda x: x.get("date_start", ""))
+        
+        return race_meetings
+    except Exception as e:
+        logger.error(f"Error fetching races: {str(e)}")
+        return []
+
+# Get the latest session for a specific meeting
+async def get_session_for_meeting(meeting_key: int) -> Optional[Dict]:
+    """Get the latest session for a specific meeting"""
+    try:
+        # Get all sessions for the meeting
+        sessions = await fetch_data("sessions", {"meeting_key": meeting_key})
         
         if not sessions:
-            logger.warning("No sessions found in the last 30 days")
-            return templates.TemplateResponse(
-                "index.html",
-                {
-                    "request": request,
-                    "error": "No sessions found in the last 30 days",
-                    "session": None
-                }
-            )
+            return None
+        
+        # Filter out testing sessions
+        race_sessions = [s for s in sessions if not any(test_type in s.get("session_name", "") for test_type in EXCLUDED_SESSION_TYPES)]
+        
+        if not race_sessions:
+            return None
         
         # Sort sessions by date and get the latest
-        sessions.sort(key=lambda x: x.get("date_start", ""), reverse=True)
-        latest_session = sessions[0]
+        race_sessions.sort(key=lambda x: x.get("date_start", ""), reverse=True)
+        latest_session = race_sessions[0]
         
-        # Format dates in the session data
+        # Format dates
         if latest_session.get("date_start"):
             latest_session["date_start"] = format_date(latest_session["date_start"])
         if latest_session.get("date_end"):
             latest_session["date_end"] = format_date(latest_session["date_end"])
         
-        logger.info(f"Found latest session: {latest_session.get('session_name')} ({latest_session.get('date_start')})")
+        return latest_session
+    except Exception as e:
+        logger.error(f"Error fetching session for meeting {meeting_key}: {str(e)}")
+        return None
+
+# Home route
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request, meeting_key: Optional[int] = None):
+    """Render the home page with session data"""
+    try:
+        # Get all races for the current year
+        races = await get_all_races()
         
+        if not races:
+            return templates.TemplateResponse(
+                "index.html",
+                {
+                    "request": request,
+                    "error": "No races found for the current year",
+                    "session": None,
+                    "races": []
+                }
+            )
+        
+        # If a meeting key is provided, get the session for that meeting
+        if meeting_key:
+            # Get session for specific meeting
+            session = await get_session_for_meeting(meeting_key)
+        else:
+            # Get the latest race
+            latest_race = races[-1]
+            session = await get_session_for_meeting(latest_race["meeting_key"])
+        
+        # If no session is found, return an error
+        if not session:
+            return templates.TemplateResponse(
+                "index.html",
+                {
+                    "request": request,
+                    "error": "No sessions found",
+                    "session": None,
+                    "races": races
+                }
+            )
+        
+        # Add meeting official name to session data
+        session["meeting_official_name"] = next((race["meeting_official_name"] for race in races if race["meeting_key"] == session["meeting_key"]), "Unknown")
+
+        # Render the home page with the session data
         return templates.TemplateResponse(
             "index.html",
             {
                 "request": request,
-                "session": latest_session,
-                "error": None
+                "session": session,
+                "error": None,
+                "races": races
             }
         )
     except Exception as e:
@@ -109,7 +179,8 @@ async def home(request: Request):
             {
                 "request": request,
                 "error": str(e),
-                "session": None
+                "session": None,
+                "races": []
             }
         )
 
